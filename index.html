@@ -205,18 +205,42 @@ const firebaseConfig = {
         loadMessages();
     }
 
-    function loadMessages() {
+function loadMessages() {
         const q = query(collection(db, "chats", currentChatId, "messages"), orderBy("time", "asc"));
         onSnapshot(q, (snaps) => {
             const box = document.getElementById('messageBox');
             box.innerHTML = "";
             snaps.forEach(d => {
                 const m = d.data();
+                
+                // --- تحويل الوقت لنظام 12 ساعة ---
+                let timeString = "";
+                if (m.time) {
+                    const date = m.time.toDate();
+                    timeString = date.toLocaleTimeString('ar-EG', { 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    });
+                }
+
                 const div = document.createElement('div');
                 div.className = `msg ${m.sender === me.uid ? 'sent' : 'received'}`;
-                if(m.type === 'text') div.innerText = m.content;
-                else if(m.type === 'image') div.innerHTML = `<img src="${m.content}">`;
-                else div.innerHTML = `<audio src="${m.content}" controls></audio>`;
+                
+                // محتوى الرسالة (نص، صورة، أو صوت)
+                let contentHTML = "";
+                if(m.type === 'text') contentHTML = `<div>${m.content}</div>`;
+                else if(m.type === 'image') contentHTML = `<img src="${m.content}" style="max-width:100%; border-radius:8px;">`;
+                else contentHTML = `<audio src="${m.content}" controls style="width:100%; max-width:200px;"></audio>`;
+
+                // إضافة الوقت أسفل الرسالة بتنسيق صغير
+                div.innerHTML = `
+                    ${contentHTML}
+                    <div style="font-size: 10px; opacity: 0.6; margin-top: 5px; text-align: left;">
+                        ${timeString}
+                    </div>
+                `;
+                
                 box.appendChild(div);
             });
             box.scrollTop = box.scrollHeight;
