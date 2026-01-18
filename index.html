@@ -2,81 +2,88 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>IQMessage Ultra - نظام المزامنة الفوري</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IQMessage Ultra Max</title>
     <style>
-        :root { --primary: #0084ff; --success: #28a745; --danger: #dc3545; --dark: #2c3e50; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; display: flex; height: 100vh; background: #f4f7f6; }
+        :root { --primary: #0084ff; --success: #28a745; --danger: #dc3545; --dark: #232d36; --light: #f0f2f5; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: var(--light); height: 100vh; display: flex; flex-direction: column; }
         
-        /* Sidebar */
-        .sidebar { width: 350px; background: white; display: flex; flex-direction: column; border-left: 2px solid #eee; }
-        .my-profile { padding: 20px; background: var(--dark); color: white; text-align: center; }
-        .friends-list { flex: 1; overflow-y: auto; }
-        .friend-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.3s; }
-        .friend-item:hover { background: #f9f9f9; }
-        .friend-item.active { background: #e3f2fd; border-right: 4px solid var(--primary); }
+        /* Layout */
+        .app-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 300px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; transition: 0.3s; }
+        .main-chat { flex: 1; display: flex; flex-direction: column; background: #e5ddd5; }
 
-        /* Main Chat */
-        .chat-area { flex: 1; display: flex; flex-direction: column; }
-        .chat-header { padding: 15px 25px; background: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #e5ddd5; }
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: absolute; z-index: 10; height: 100%; left: 0; display: none; }
+            .sidebar.active { display: flex; }
+        }
+
+        /* UI Elements */
+        .header { padding: 15px; background: var(--dark); color: white; display: flex; justify-content: space-between; align-items: center; }
+        .messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px; border-radius: 12px; max-width: 80%; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .sent { align-self: flex-end; background: #dcf8c6; }
+        .received { align-self: flex-start; background: white; }
+        .msg img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+
+        /* Inputs */
+        .input-area { padding: 10px; background: #f0f0f0; display: flex; gap: 8px; align-items: center; }
+        .input-area input { flex: 1; padding: 12px; border-radius: 25px; border: none; outline: none; }
+        .circle-btn { width: 45px; height: 45px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; }
         
-        /* Message Bubbles */
-        .msg { padding: 12px 16px; border-radius: 15px; max-width: 65%; font-size: 15px; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .sent { align-self: flex-end; background: #dcf8c6; border-bottom-right-radius: 2px; }
-        .received { align-self: flex-start; background: white; border-bottom-left-radius: 2px; }
-
         /* Call Overlay */
-        #callUI { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--dark); color: white; 
-                  display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .call-avatar { width: 120px; height: 120px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 50px; margin-bottom: 20px; }
-        
-        /* Controls */
-        .input-box { padding: 20px; background: white; display: flex; gap: 15px; align-items: center; }
-        .input-box input { flex: 1; padding: 12px 20px; border-radius: 30px; border: 1px solid #ddd; outline: none; }
-        .action-btn { width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer; color: white; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+        #callOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display:none; flex-direction:column; align-items:center; justify-content:center; color:white; z-index:9999; }
+        .recording-active { background: var(--danger) !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div id="callUI">
-        <div class="call-avatar">👤</div>
-        <h2 id="callerName">مكالمة واردة...</h2>
-        <div id="callTimer">00:00</div>
+    <div id="callOverlay">
+        <div style="font-size: 60px; margin-bottom: 20px;">👤</div>
+        <h2 id="callInfo">مكالمة واردة...</h2>
         <audio id="remoteAudio" autoplay></audio>
-        <div style="display: flex; gap: 20px; margin-top: 30px;">
-            <button id="acceptBtn" class="action-btn" style="background:var(--success); display:none;">📞</button>
-            <button onclick="endCall()" class="action-btn" style="background:var(--danger);">📵</button>
+        <div style="display: flex; gap: 20px;">
+            <button id="acceptCall" class="circle-btn" style="background:var(--success); display:none;">📞</button>
+            <button onclick="rejectOrEndCall()" class="circle-btn" style="background:var(--danger);">📵</button>
         </div>
     </div>
 
-    <div class="sidebar">
-        <div class="my-profile">
-            <div style="font-size: 1.2em; font-weight: bold;">IQMessage Pro</div>
-            <div id="myHandle" style="font-size: 0.9em; margin-top: 5px; opacity: 0.8;">جاري التحميل...</div>
-        </div>
-        <div style="padding: 15px;">
-            <input type="text" id="targetInput" placeholder="أضف صديق بالمعرف..." style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd;">
-            <button onclick="addFriend()" style="width:100%; margin-top:10px; padding:10px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer;">إضافة لقائمة المحادثات</button>
-        </div>
-        <div class="friends-list" id="friendsContainer"></div>
+    <div class="header">
+        <span>IQMessage Pro</span>
+        <small id="myHandle">جاري التحميل...</small>
+        <button onclick="toggleSidebar()" id="menuBtn" style="display:none;">☰</button>
     </div>
 
-    <div class="chat-area">
-        <div class="chat-header">
-            <div id="activeChatName" style="font-weight: bold; font-size: 1.1em;">اختر محادثة</div>
-            <button onclick="makeCall()" id="callIcon" style="display:none; background:none; border:none; font-size: 24px; cursor:pointer;">📞</button>
+    <div class="app-container">
+        <div class="sidebar" id="sidebar">
+            <div style="padding: 15px;">
+                <input type="text" id="targetUser" placeholder="أضف @user..." style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc;">
+                <button onclick="addFriend()" style="width:100%; margin-top:10px; padding:10px; background:var(--primary); color:white; border:none; border-radius:8px;">إضافة صديق</button>
+            </div>
+            <div id="contactsList" style="flex:1; overflow-y:auto;"></div>
         </div>
-        <div class="messages" id="messageBox"></div>
-        <div class="input-box">
-            <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
-            <button class="action-btn" style="background:var(--danger);" onmousedown="startVoice()" onmouseup="stopVoice()">🎤</button>
-            <button class="action-btn" style="background:var(--primary);" onclick="sendMsg()">➤</button>
+
+        <div class="main-chat">
+            <div id="chatHeader" style="padding:10px; background:#eee; display:flex; justify-content:space-between;">
+                <b id="activeFriendTitle">اختر محادثة</b>
+                <button id="callBtn" onclick="startCall()" style="display:none; border:none; background:none; font-size:20px; cursor:pointer;">📞</button>
+            </div>
+            <div class="messages" id="messageBox"></div>
+            <div class="input-area">
+                <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="sendImage(this)">
+                <button class="circle-btn" style="background:#666;" onclick="document.getElementById('fileInput').click()">📷</button>
+                <input type="text" id="msgText" placeholder="اكتب رسالة...">
+                <button id="micBtn" class="circle-btn" style="background:var(--danger);" onmousedown="recordStart()" onmouseup="recordStop()">🎤</button>
+                <button class="circle-btn" style="background:var(--primary);" onclick="sendTextMsg()">➤</button>
+            </div>
         </div>
     </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -93,117 +100,108 @@ const firebaseConfig = {
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    let me, currentFriend = null, currentChatId = null;
-    let peerConn, localStream;
+    let me, currentChatId, friendUid, recorder, chunks = [];
 
-    // --- 1. نظام الهوية والمزامنة الشاملة ---
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             me = user;
-            const userRef = doc(db, "users", user.uid);
-            const snap = await getDoc(userRef);
-            let handle = snap.exists() ? snap.data().handle : "@user_" + Math.floor(1000 + Math.random() * 9000);
-            if(!snap.exists()) await setDoc(userRef, { handle, uid: user.uid, status: "online" });
-            document.getElementById('myHandle').innerText = "معرفك: " + handle;
+            const uRef = doc(db, "users", user.uid);
+            const snap = await getDoc(uRef);
+            let handle = snap.exists() ? snap.data().handle : "@user_" + user.uid.substring(0,4);
+            if(!snap.exists()) await setDoc(uRef, { handle, uid: user.uid });
+            document.getElementById('myHandle').innerText = handle;
             
-            listenForIncomingActions(); // الاستماع الدائم للمكالمات والرسائل الجديدة
+            // الاستماع للمكالمات (الرفض والقبول)
+            onSnapshot(doc(db, "calls", me.uid), (s) => {
+                if(!s.exists()) { document.getElementById('callOverlay').style.display = 'none'; return; }
+                const data = s.data();
+                if(data.type === 'offer') showIncomingCall(data);
+                if(data.type === 'answer') connectCall(data.answer);
+            });
+
+            // الاستماع لقائمة الأصدقاء
+            onSnapshot(collection(db, "users", me.uid, "contacts"), (s) => {
+                const list = document.getElementById('contactsList');
+                list.innerHTML = "";
+                s.forEach(d => {
+                    const f = d.data();
+                    const el = document.createElement('div');
+                    el.style = "padding:15px; border-bottom:1px solid #eee; cursor:pointer;";
+                    el.innerText = f.handle;
+                    el.onclick = () => selectFriend(f);
+                    list.appendChild(el);
+                });
+            });
         } else { signInAnonymously(auth); }
     });
 
-    // --- 2. الاستماع التلقائي (أهم جزء طلبته) ---
-    function listenForIncomingActions() {
-        // الاستماع للمكالمات الواردة
-        onSnapshot(doc(db, "calls", me.uid), async (snap) => {
-            const data = snap.data();
-            if (data && data.type === "offer") {
-                showCallUI(data.callerName, true, data);
-            }
-        });
-
-        // الاستماع للمحادثات الجديدة التي تُضاف لي
-        onSnapshot(query(collection(db, "users", me.uid, "contacts")), (snap) => {
-            const container = document.getElementById('friendsContainer');
-            container.innerHTML = "";
-            snap.forEach(d => {
-                const friend = d.data();
-                const div = document.createElement('div');
-                div.className = `friend-item ${currentFriend?.uid === friend.uid ? 'active' : ''}`;
-                div.innerText = friend.handle;
-                div.onclick = () => selectFriend(friend);
-                container.appendChild(div);
-            });
-        });
-    }
-
-    // --- 3. نظام المكالمات المحسن (WebRTC) ---
-    async function showCallUI(name, isIncoming, callData = null) {
-        const ui = document.getElementById('callUI');
-        ui.style.display = 'flex';
-        document.getElementById('callerName').innerText = name;
-        
-        if (isIncoming) {
-            const accBtn = document.getElementById('acceptBtn');
-            accBtn.style.display = 'flex';
-            accBtn.onclick = async () => {
-                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                peerConn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-                localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
-                
-                peerConn.ontrack = e => document.getElementById('remoteAudio').srcObject = e.streams[0];
-                await peerConn.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                
-                const answer = await peerConn.createAnswer();
-                await peerConn.setLocalDescription(answer);
-                await updateDoc(doc(db, "calls", me.uid), { type: "answer", answer: { sdp: answer.sdp, type: answer.type } });
-                accBtn.style.display = 'none';
+    // --- الرسائل الصوتية ---
+    window.recordStart = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = async () => {
+                await addDoc(collection(db, "chats", currentChatId, "messages"), {
+                    content: reader.result, type: 'audio', sender: me.uid, time: serverTimestamp()
+                });
             };
-        }
-    }
+            chunks = [];
+        };
+        recorder.start();
+        document.getElementById('micBtn').classList.add('recording-active');
+    };
+    window.recordStop = () => { recorder.stop(); document.getElementById('micBtn').classList.remove('recording-active'); };
 
-    window.makeCall = async () => {
-        showCallUI(currentFriend.handle, false);
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        peerConn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
-
-        peerConn.ontrack = e => document.getElementById('remoteAudio').srcObject = e.streams[0];
-        const offer = await peerConn.createOffer();
-        await peerConn.setLocalDescription(offer);
-
-        await setDoc(doc(db, "calls", currentFriend.uid), {
-            type: "offer",
-            offer: { sdp: offer.sdp, type: offer.type },
-            callerName: document.getElementById('myHandle').innerText
-        });
-
-        // مراقبة الرد
-        onSnapshot(doc(db, "calls", currentFriend.uid), async (snap) => {
-            if(snap.data()?.type === "answer") {
-                await peerConn.setRemoteDescription(new RTCSessionDescription(snap.data().answer));
-            }
-        });
+    // --- إرسال الصور ---
+    window.sendImage = (input) => {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            await addDoc(collection(db, "chats", currentChatId, "messages"), {
+                content: reader.result, type: 'image', sender: me.uid, time: serverTimestamp()
+            });
+        };
     };
 
-    // --- 4. إدارة الرسائل والاتصال المباشر ---
+    // --- المكالمات (إغلاق عند الرفض) ---
+    window.rejectOrEndCall = async () => {
+        await deleteDoc(doc(db, "calls", me.uid));
+        if(friendUid) await deleteDoc(doc(db, "calls", friendUid));
+        location.reload(); 
+    };
+
+    // بقية وظائف إضافة صديق وإرسال النص (نفس المنطق السابق)
     window.addFriend = async () => {
-        const handle = document.getElementById('targetInput').value;
+        const handle = document.getElementById('targetUser').value;
         const q = query(collection(db, "users"), where("handle", "==", handle));
         const snap = await getDocs(q);
         if(!snap.empty) {
-            const friendData = snap.docs[0].data();
-            // أضف الصديق عندي وعند الطرف الآخر ليظهر له فوراً
-            await setDoc(doc(db, "users", me.uid, "contacts", friendData.uid), friendData);
+            const f = snap.docs[0].data();
+            await setDoc(doc(db, "users", me.uid, "contacts", f.uid), f);
             const myInfo = (await getDoc(doc(db, "users", me.uid))).data();
-            await setDoc(doc(db, "users", friendData.uid, "contacts", me.uid), myInfo);
-            alert("تمت الإضافة! ستظهر المحادثة لدى الطرفين الآن.");
+            await setDoc(doc(db, "users", f.uid, "contacts", me.uid), myInfo);
         }
     };
 
-    async function selectFriend(friend) {
-        currentFriend = friend;
-        currentChatId = me.uid < friend.uid ? `${me.uid}_${friend.uid}` : `${friend.uid}_${me.uid}`;
-        document.getElementById('activeChatName').innerText = friend.handle;
-        document.getElementById('callIcon').style.display = 'block';
+    window.sendTextMsg = async () => {
+        const txt = document.getElementById('msgText').value;
+        if(!currentChatId || !txt) return;
+        await addDoc(collection(db, "chats", currentChatId, "messages"), {
+            content: txt, type: 'text', sender: me.uid, time: serverTimestamp()
+        });
+        document.getElementById('msgText').value = "";
+    };
+
+    async function selectFriend(f) {
+        friendUid = f.uid;
+        currentChatId = me.uid < f.uid ? `${me.uid}_${f.uid}` : `${f.uid}_${me.uid}`;
+        document.getElementById('activeFriendTitle').innerText = f.handle;
+        document.getElementById('callBtn').style.display = 'block';
         loadMessages();
     }
 
@@ -216,23 +214,16 @@ const firebaseConfig = {
                 const m = d.data();
                 const div = document.createElement('div');
                 div.className = `msg ${m.sender === me.uid ? 'sent' : 'received'}`;
-                div.innerText = m.content;
+                if(m.type === 'text') div.innerText = m.content;
+                else if(m.type === 'image') div.innerHTML = `<img src="${m.content}">`;
+                else div.innerHTML = `<audio src="${m.content}" controls></audio>`;
                 box.appendChild(div);
             });
             box.scrollTop = box.scrollHeight;
         });
     }
 
-    window.sendMsg = async () => {
-        const val = document.getElementById('msgInput').value;
-        if(!currentChatId || !val) return;
-        await addDoc(collection(db, "chats", currentChatId, "messages"), {
-            content: val, sender: me.uid, time: serverTimestamp()
-        });
-        document.getElementById('msgInput').value = "";
-    };
-
-    window.endCall = () => location.reload();
+    window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('active');
 </script>
 </body>
 </html>
