@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تطبيق مراسلة حقيقي - IQMessage</title>
+    <style>
+        :root { --primary: #0084ff; --bg: #f0f2f5; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; height: 100vh; margin: 0; }
+        
+        /* القائمة الجانبية */
+        .sidebar { width: 300px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
+        .user-info { padding: 15px; background: #eee; font-weight: bold; color: #333; border-bottom: 2px solid var(--primary); }
+        .search-box { padding: 20px; border-bottom: 1px solid #eee; }
+        .search-box input { width: 100%; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; box-sizing: border-box; }
+        
+        /* منطقة الدردشة */
+        .chat-area { flex: 1; display: flex; flex-direction: column; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        .message { max-width: 70%; padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; word-wrap: break-word; }
+        .sent { align-self: flex-end; background: var(--primary); color: white; }
+        .received { align-self: flex-start; background: #e4e6eb; color: black; }
+        
+        /* صندوق الإدخال */
+        .input-area { padding: 20px; background: white; display: flex; gap: 10px; }
+        .input-area input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ddd; outline: none; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="user-info" id="myHandleDisplay">جاري التحميل...</div>
+        
+        <div class="search-box">
+            <input type="text" id="friendHandle" placeholder="أضف صديق بواسطة @username...">
+            <button class="btn" onclick="window.addFriend()" style="margin-top:10px; width:100%">إضافة وبدء دردشة</button>
+        </div>
+        <div id="friendsList" style="overflow-y:auto"></div>
+    </div>
+
+    <div class="chat-area">
+        <div class="messages" id="messageContainer"></div>
+        <div class="input-area">
+            <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
+            <button class="btn" onclick="window.sendMessage()">إرسال</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // --- ضع بياناتك هنا ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA3wLBeOqmW1LZBLR2icOwDdbUBD8EstYQ",
+  authDomain: "iqmassege.firebaseapp.com",
+  projectId: "iqmassege",
+  storageBucket: "iqmassege.firebasestorage.app",
+  messagingSenderId: "430582759156",
+  appId: "1:430582759156:web:b0fcd429433607e16ae8a1",
+  measurementId: "G-V79WXF88B5"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUser = null;
+        let activeChatId = null;
+
+        // 1. عند دخول الموقع: تسجيل الدخول وجلب المعرف
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                let userRef = doc(db, "users", user.uid);
+                let userSnap = await getDoc(userRef);
+                
+                let myHandle;
+                if (!userSnap.exists()) {
+                    myHandle = "@user_" + user.uid.substring(0, 5);
+                    await setDoc(userRef, { handle: myHandle, uid: user.uid });
+                } else {
+                    myHandle = userSnap.data().handle;
+                }
+                document.getElementById('myHandleDisplay').innerText = "معرفك: " + myHandle;
+            } else {
+                signInAnonymously(auth);
+            }
+        });
+
+        // 2. وظيفة إضافة صديق
+        window.addFriend = async () => {
+            const handle = document.getElementById('friendHandle').value;
+            const q = query(collection(db, "users"), where("handle", "==", handle));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                querySnapshot.forEach((doc) => {
+                    const friend = doc.data();
+                    // إنشاء معرف فريد للمحادثة بين الشخصين
+                    activeChatId = currentUser.uid < friend.uid ? `${currentUser.uid}_${friend.uid}` : `${friend.uid}_${currentUser.uid}`;
+                    alert("تم الاتصال بـ " + friend.handle);
+                    loadMessages(); // جلب الرسائل المحفوظة
+                });
+            } else {
+                alert("المعرف غير موجود!");
+            }
+        };
+
+        // 3. وظيفة جلب الرسائل (تنفيذ حقيقي للحفظ الدائم)
+        function loadMessages() {
+            const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("timestamp", "asc"));
+            onSnapshot(q, (snapshot) => {
+                const container = document.getElementById('messageContainer');
+                container.innerHTML = "";
+                snapshot.forEach((doc) => {
+                    const msg = doc.data();
+                    const div = document.createElement('div');
+                    div.className = `message ${msg.senderId === currentUser.uid ? 'sent' : 'received'}`;
+                    div.innerText = msg.text;
+                    container.appendChild(div);
+                });
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+
+        // 4. إرسال الرسالة وحفظها في السحابة
+        window.sendMessage = async () => {
+            const input = document.getElementById('msgInput');
+            if(!activeChatId || input.value.trim() === "") return;
+
+            await addDoc(collection(db, "chats", activeChatId, "messages"), {
+                text: input.value,
+                senderId: currentUser.uid,
+                timestamp: serverTimestamp()
+            });
+            input.value = "";
+        };
+    </script>
+</body>
+</html>
