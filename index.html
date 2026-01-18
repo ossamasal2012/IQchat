@@ -2,56 +2,75 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تطبيق مراسلة حقيقي - IQMessage</title>
+    <title>IQMessage VIP - مكالمات ورسائل</title>
     <style>
-        :root { --primary: #0084ff; --bg: #f0f2f5; }
-        body { font-family: sans-serif; background: var(--bg); display: flex; height: 100vh; margin: 0; }
+        :root { --primary: #0084ff; --success: #28a745; --danger: #dc3545; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: #e5ddd5; }
         
-        /* القائمة الجانبية */
-        .sidebar { width: 300px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; }
-        .user-info { padding: 15px; background: #eee; font-weight: bold; color: #333; border-bottom: 2px solid var(--primary); }
-        .search-box { padding: 20px; border-bottom: 1px solid #eee; }
-        .search-box input { width: 100%; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none; box-sizing: border-box; }
+        /* Sidebar */
+        .sidebar { width: 300px; background: white; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+        .user-card { padding: 15px; background: var(--primary); color: white; text-align: center; }
         
-        /* منطقة الدردشة */
-        .chat-area { flex: 1; display: flex; flex-direction: column; }
-        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
-        .message { max-width: 70%; padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; word-wrap: break-word; }
-        .sent { align-self: flex-end; background: var(--primary); color: white; }
-        .received { align-self: flex-start; background: #e4e6eb; color: black; }
+        /* Main Chat */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .chat-header { padding: 10px 20px; background: #f0f0f0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        .messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
-        /* صندوق الإدخال */
-        .input-area { padding: 20px; background: white; display: flex; gap: 10px; }
-        .input-area input { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ddd; outline: none; }
-        .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; }
+        /* Bubbles */
+        .msg { padding: 10px; border-radius: 12px; max-width: 70%; font-size: 14px; position: relative; }
+        .sent { align-self: flex-end; background: #dcf8c6; }
+        .received { align-self: flex-start; background: white; }
+        
+        /* Call UI */
+        #callOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); 
+                        display: none; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 1000; }
+        
+        /* Controls */
+        .input-bar { padding: 15px; background: #f0f0f0; display: flex; gap: 10px; }
+        .btn { border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-call { background: var(--success); }
+        .btn-send { background: var(--primary); }
+        .btn-mic { background: var(--danger); }
+        input { flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ccc; outline: none; }
     </style>
 </head>
 <body>
 
+    <div id="callOverlay">
+        <h2 id="callStatus">جارٍ الاتصال...</h2>
+        <audio id="remoteAudio" autoplay></audio>
+        <button class="btn" style="background:var(--danger); margin-top: 20px;" onclick="endCall()">إنهاء المكالمة</button>
+    </div>
+
     <div class="sidebar">
-        <div class="user-info" id="myHandleDisplay">جاري التحميل...</div>
-        
-        <div class="search-box">
-            <input type="text" id="friendHandle" placeholder="أضف صديق بواسطة @username...">
-            <button class="btn" onclick="window.addFriend()" style="margin-top:10px; width:100%">إضافة وبدء دردشة</button>
+        <div class="user-card">
+            <div id="myHandle">جاري التحميل...</div>
         </div>
-        <div id="friendsList" style="overflow-y:auto"></div>
+        <div style="padding: 15px;">
+            <input type="text" id="friendID" placeholder="أدخل @user للصديق">
+            <button class="btn btn-send" style="width: 100%; margin-top: 10px;" onclick="startChat()">بدء المحادثة</button>
+        </div>
+        <div id="friendsList"></div>
     </div>
 
-    <div class="chat-area">
-        <div class="messages" id="messageContainer"></div>
-        <div class="input-area">
-            <input type="text" id="msgInput" placeholder="اكتب رسالتك هنا...">
-            <button class="btn" onclick="window.sendMessage()">إرسال</button>
+    <div class="main">
+        <div class="chat-header">
+            <strong id="chatTitle">اختر صديقاً</strong>
+            <button class="btn btn-call" id="callBtn" style="display: none;" onclick="initiateCall()">📞 مكالمة صوتية</button>
+        </div>
+        <div class="messages" id="messageBox"></div>
+        <div class="input-bar">
+            <input type="text" id="textInput" placeholder="اكتب رسالة...">
+            <button class="btn btn-mic" onmousedown="startVoice()" onmouseup="stopVoice()">🎤</button>
+            <button class="btn btn-send" onclick="sendText()">➤</button>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- ضع بياناتك هنا ---
 const firebaseConfig = {
   apiKey: "AIzaSyA3wLBeOqmW1LZBLR2icOwDdbUBD8EstYQ",
   authDomain: "iqmassege.firebaseapp.com",
@@ -62,81 +81,128 @@ const firebaseConfig = {
   measurementId: "G-V79WXF88B5"
 };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-        let currentUser = null;
-        let activeChatId = null;
+    let me, currentChatId, friendUid;
+    let localStream, peerConnection;
+    const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
-        // 1. عند دخول الموقع: تسجيل الدخول وجلب المعرف
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                let userRef = doc(db, "users", user.uid);
-                let userSnap = await getDoc(userRef);
-                
-                let myHandle;
-                if (!userSnap.exists()) {
-                    myHandle = "@user_" + user.uid.substring(0, 5);
-                    await setDoc(userRef, { handle: myHandle, uid: user.uid });
-                } else {
-                    myHandle = userSnap.data().handle;
-                }
-                document.getElementById('myHandleDisplay').innerText = "معرفك: " + myHandle;
-            } else {
-                signInAnonymously(auth);
-            }
+    // --- نظام الهوية ---
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            me = user;
+            const userRef = doc(db, "users", user.uid);
+            const snap = await getDoc(userRef);
+            let handle = snap.exists() ? snap.data().handle : "@user_" + user.uid.substring(0,4);
+            if(!snap.exists()) await setDoc(userRef, { handle, uid: user.uid });
+            document.getElementById('myHandle').innerText = "أنت: " + handle;
+            listenForCalls(); // ابدأ الاستماع للمكالمات القادمة
+        } else { signInAnonymously(auth); }
+    });
+
+    // --- وظيفة المكالمة الصوتية (WebRTC) ---
+    window.initiateCall = async () => {
+        document.getElementById('callOverlay').style.display = 'flex';
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        peerConnection = new RTCPeerConnection(servers);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = (event) => {
+            document.getElementById('remoteAudio').srcObject = event.streams[0];
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        // إرسال طلب المكالمة عبر Firestore
+        await setDoc(doc(db, "calls", friendUid), {
+            offer: { type: offer.type, sdp: offer.sdp },
+            callerHandle: document.getElementById('myHandle').innerText,
+            callerUid: me.uid
         });
 
-        // 2. وظيفة إضافة صديق
-        window.addFriend = async () => {
-            const handle = document.getElementById('friendHandle').value;
-            const q = query(collection(db, "users"), where("handle", "==", handle));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                querySnapshot.forEach((doc) => {
-                    const friend = doc.data();
-                    // إنشاء معرف فريد للمحادثة بين الشخصين
-                    activeChatId = currentUser.uid < friend.uid ? `${currentUser.uid}_${friend.uid}` : `${friend.uid}_${currentUser.uid}`;
-                    alert("تم الاتصال بـ " + friend.handle);
-                    loadMessages(); // جلب الرسائل المحفوظة
-                });
-            } else {
-                alert("المعرف غير موجود!");
+        // الاستماع للرد (Answer)
+        onSnapshot(doc(db, "calls", friendUid), async (snap) => {
+            const data = snap.data();
+            if (data?.answer && !peerConnection.currentRemoteDescription) {
+                const answerDescription = new RTCSessionDescription(data.answer);
+                await peerConnection.setRemoteDescription(answerDescription);
+                document.getElementById('callStatus').innerText = "في مكالمة...";
             }
-        };
+        });
+    };
 
-        // 3. وظيفة جلب الرسائل (تنفيذ حقيقي للحفظ الدائم)
-        function loadMessages() {
-            const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("timestamp", "asc"));
-            onSnapshot(q, (snapshot) => {
-                const container = document.getElementById('messageContainer');
-                container.innerHTML = "";
-                snapshot.forEach((doc) => {
-                    const msg = doc.data();
-                    const div = document.createElement('div');
-                    div.className = `message ${msg.senderId === currentUser.uid ? 'sent' : 'received'}`;
-                    div.innerText = msg.text;
-                    container.appendChild(div);
-                });
-                container.scrollTop = container.scrollHeight;
-            });
+    function listenForCalls() {
+        onSnapshot(doc(db, "calls", me.uid), async (snap) => {
+            const data = snap.data();
+            if (data && data.offer && !peerConnection) {
+                if (confirm(`مكالمة واردة من ${data.callerHandle}.. هل تريد الرد؟`)) {
+                    document.getElementById('callOverlay').style.display = 'flex';
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    peerConnection = new RTCPeerConnection(servers);
+                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+                    peerConnection.ontrack = (event) => {
+                        document.getElementById('remoteAudio').srcObject = event.streams[0];
+                    };
+
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+
+                    await setDoc(doc(db, "calls", me.uid), { answer: { type: answer.type, sdp: answer.sdp } }, { merge: true });
+                    document.getElementById('callStatus').innerText = "في مكالمة...";
+                }
+            }
+        });
+    }
+
+    window.endCall = async () => {
+        location.reload(); // أسرع طريقة لإنهاء الروابط البرمجية
+    };
+
+    // --- الرسائل النصية والصوتية (نفس النظام السابق المحسن) ---
+    window.startChat = async () => {
+        const handle = document.getElementById('friendID').value;
+        const q = query(collection(db, "users"), where("handle", "==", handle));
+        const snap = await getDocs(q);
+        if(!snap.empty) {
+            const f = snap.docs[0].data();
+            friendUid = f.uid;
+            currentChatId = me.uid < f.uid ? `${me.uid}_${f.uid}` : `${f.uid}_${me.uid}`;
+            document.getElementById('chatTitle').innerText = "دردشة: " + handle;
+            document.getElementById('callBtn').style.display = 'block';
+            loadMessages();
         }
+    };
 
-        // 4. إرسال الرسالة وحفظها في السحابة
-        window.sendMessage = async () => {
-            const input = document.getElementById('msgInput');
-            if(!activeChatId || input.value.trim() === "") return;
+    window.sendText = async () => {
+        const text = document.getElementById('textInput').value;
+        if(!currentChatId || !text) return;
+        await addDoc(collection(db, "chats", currentChatId, "messages"), {
+            content: text, type: 'text', sender: me.uid, time: serverTimestamp()
+        });
+        document.getElementById('textInput').value = "";
+    };
 
-            await addDoc(collection(db, "chats", activeChatId, "messages"), {
-                text: input.value,
-                senderId: currentUser.uid,
-                timestamp: serverTimestamp()
+    function loadMessages() {
+        const q = query(collection(db, "chats", currentChatId, "messages"), orderBy("time", "asc"));
+        onSnapshot(q, (snaps) => {
+            const box = document.getElementById('messageBox');
+            box.innerHTML = "";
+            snaps.forEach(d => {
+                const m = d.data();
+                const div = document.createElement('div');
+                div.className = `msg ${m.sender === me.uid ? 'sent' : 'received'}`;
+                div.innerText = m.content;
+                box.appendChild(div);
             });
-            input.value = "";
-        };
-    </script>
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+</script>
 </body>
 </html>
