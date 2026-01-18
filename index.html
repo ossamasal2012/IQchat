@@ -6,7 +6,7 @@
     <title>IQMessage Ultra Max V2</title>
     <style>
         :root { --primary: #0084ff; --success: #28a745; --danger: #dc3545; --dark: #232d36; --light: #f0f2f5; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: var(--light); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
         /* Layout */
         .app-container { display: flex; flex: 1; overflow: hidden; }
@@ -22,13 +22,15 @@
         /* Voice Message Styling */
         .voice-msg-container { display: flex; align-items: center; gap: 10px; min-width: 160px; padding: 5px 0; }
         .play-btn { width: 35px; height: 35px; border-radius: 50%; background: var(--primary); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .voice-wave { flex: 1; height: 3px; background: rgba(0,0,0,0.1); position: relative; border-radius: 2px; }
+        .voice-wave { flex: 1; height: 3px; background: rgba(0,0,0,0.2); position: relative; border-radius: 2px; }
 
         /* Call UI */
         #callOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle, #2c3e50, #000); display:none; flex-direction:column; align-items:center; justify-content:center; color:white; z-index:9999; }
         
         /* Responsive */
-        @media (max-width: 768px) { .sidebar { display: none; } }
+        @media (max-width: 768px) { .sidebar { width: 100%; display: none; } .sidebar.active { display: flex; position: absolute; z-index: 10; height: 100%; } }
+
+        input, button { font-family: inherit; }
     </style>
 </head>
 <body>
@@ -43,29 +45,40 @@
         </div>
     </div>
 
-    <div class="main-chat">
-        <div style="padding:10px; background:#eee; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd;">
-            <b id="activeFriendTitle">اختر محادثة</b>
-            <button id="callBtn" onclick="initiateVoiceCall()" style="display:none; border:none; background:none; font-size:24px; cursor:pointer;">📞</button>
+    <div class="app-container">
+        <div class="sidebar" id="sidebar">
+            <div style="padding: 20px; background: var(--dark); color: white; text-align: center;">
+                <div style="font-weight: bold;">IQMessage Pro</div>
+                <small id="myHandleDisplay">جاري التحميل...</small>
+            </div>
+            <div style="padding: 15px; border-bottom: 1px solid #eee;">
+                <input type="text" id="targetInput" placeholder="أضف @username الصديق..." style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; box-sizing: border-box;">
+                <button onclick="addFriend()" style="width:100%; margin-top:10px; padding:10px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer;">بدء محادثة</button>
+            </div>
+            <div id="contactsList" style="flex:1; overflow-y:auto;"></div>
         </div>
-        
-        <div class="messages" id="messageBox"></div>
 
-        <div style="padding:10px; background:#f0f0f0; display:flex; gap:10px; align-items:center;">
-            <input type="text" id="msgText" placeholder="اكتب رسالة..." style="flex:1; padding:12px; border-radius:25px; border:none; outline:none;">
-            <button id="micBtn" onmousedown="startRecording()" onmouseup="stopRecording()" style="width:45px; height:45px; border-radius:50%; border:none; background:var(--danger); color:white; cursor:pointer;">🎤</button>
-            <button onclick="sendTextMsg()" style="width:45px; height:45px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer;">➤</button>
+        <div class="main-chat">
+            <div style="padding:10px; background:#eee; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd;">
+                <b id="activeFriendTitle">اختر محادثة</b>
+                <button id="callBtn" onclick="initiateVoiceCall()" style="display:none; border:none; background:none; font-size:24px; cursor:pointer;">📞</button>
+            </div>
+            
+            <div class="messages" id="messageBox"></div>
+
+            <div style="padding:10px; background:#f0f0f0; display:flex; gap:10px; align-items:center;">
+                <input type="text" id="msgText" placeholder="اكتب رسالة..." style="flex:1; padding:12px; border-radius:25px; border:none; outline:none;">
+                <button id="micBtn" onmousedown="startRecording()" onmouseup="stopRecording()" style="width:45px; height:45px; border-radius:50%; border:none; background:var(--danger); color:white; cursor:pointer;">🎤</button>
+                <button onclick="sendTextMsg()" style="width:45px; height:45px; border-radius:50%; border:none; background:var(--primary); color:white; cursor:pointer;">➤</button>
+            </div>
         </div>
     </div>
 
 <script type="module">
-    // (ضع هنا استيرادات Firebase السابقة وكود الـ Config الخاص بك)
-    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-    // --- هذا هو المكان الصحيح للكود الخاص بك ---
     const firebaseConfig = {
         apiKey: "AIzaSyA3wLBeOqmW1LZBLR2icOwDdbUBD8EstYQ",
         authDomain: "iqmassege.firebaseapp.com",
@@ -76,49 +89,137 @@
         measurementId: "G-V79WXF88B5"
     };
 
-    // تهيئة التطبيق
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // ... بقية الأكواد البرمجية (المكالمات، الرسائل، إلخ)
-</script>
+    let me = null;
+    let friendUid = null;
+    let currentChatId = null;
     let localStream, peerConn, currentCallData;
+    let recorder, chunks = [];
 
-    // --- تحسين المكالمة الصوتية ---
+    // --- نظام الهوية والمزامنة ---
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            me = user;
+            const uRef = doc(db, "users", user.uid);
+            const snap = await getDoc(uRef);
+            let handle = snap.exists() ? snap.data().handle : "@user_" + user.uid.substring(0,4);
+            if(!snap.exists()) {
+                await setDoc(uRef, { handle: handle, uid: user.uid });
+                me.handle = handle;
+            } else {
+                me.handle = snap.data().handle;
+            }
+            document.getElementById('myHandleDisplay').innerText = "معرفك: " + me.handle;
+            
+            listenForCalls();
+            listenForContacts();
+        } else {
+            signInAnonymously(auth);
+        }
+    });
+
+    // --- وظائف المراسلة ---
+    window.addFriend = async () => {
+        const handle = document.getElementById('targetInput').value.trim();
+        if(!handle) return;
+        const q = query(collection(db, "users"), where("handle", "==", handle));
+        const snap = await getDocs(q);
+        if(!snap.empty) {
+            const fData = snap.docs[0].data();
+            await setDoc(doc(db, "users", me.uid, "contacts", fData.uid), fData);
+            await setDoc(doc(db, "users", fData.uid, "contacts", me.uid), { handle: me.handle, uid: me.uid });
+            document.getElementById('targetInput').value = "";
+        } else {
+            alert("المعرف غير موجود!");
+        }
+    };
+
+    function listenForContacts() {
+        onSnapshot(collection(db, "users", me.uid, "contacts"), (snap) => {
+            const list = document.getElementById('contactsList');
+            list.innerHTML = "";
+            snap.forEach(d => {
+                const f = d.data();
+                const div = document.createElement('div');
+                div.style = "padding:15px; border-bottom:1px solid #eee; cursor:pointer;";
+                div.innerText = f.handle;
+                div.onclick = () => selectFriend(f);
+                list.appendChild(div);
+            });
+        });
+    }
+
+    async function selectFriend(f) {
+        friendUid = f.uid;
+        currentChatId = me.uid < f.uid ? `${me.uid}_${f.uid}` : `${f.uid}_${me.uid}`;
+        document.getElementById('activeFriendTitle').innerText = f.handle;
+        document.getElementById('callBtn').style.display = 'block';
+        loadMessages();
+    }
+
+    window.sendTextMsg = async () => {
+        const txt = document.getElementById('msgText').value.trim();
+        if(!currentChatId || !txt) return;
+        await addDoc(collection(db, "chats", currentChatId, "messages"), {
+            content: txt, type: 'text', sender: me.uid, time: serverTimestamp()
+        });
+        document.getElementById('msgText').value = "";
+    };
+
+    // --- الرسائل الصوتية ---
+    window.startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recorder = new MediaRecorder(stream);
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = async () => {
+                    await addDoc(collection(db, "chats", currentChatId, "messages"), {
+                        content: reader.result, type: 'audio', sender: me.uid, time: serverTimestamp()
+                    });
+                };
+                chunks = [];
+            };
+            recorder.start();
+            document.getElementById('micBtn').style.background = "orange";
+        } catch (e) { alert("الميكروفون مطلوب!"); }
+    };
+
+    window.stopRecording = () => {
+        if(recorder) {
+            recorder.stop();
+            document.getElementById('micBtn').style.background = "var(--danger)";
+        }
+    };
+
+    // --- نظام المكالمات ---
     window.initiateVoiceCall = async () => {
-        if (!friendUid) return;
         document.getElementById('callOverlay').style.display = 'flex';
-        document.getElementById('callInfo').innerText = "جارٍ الاتصال بـ " + document.getElementById('activeFriendTitle').innerText;
-
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             peerConn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-            
-            localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
+            localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
             peerConn.ontrack = e => document.getElementById('remoteAudio').srcObject = e.streams[0];
 
             const offer = await peerConn.createOffer();
             await peerConn.setLocalDescription(offer);
-
             await setDoc(doc(db, "calls", friendUid), {
-                type: 'offer',
-                offer: { sdp: offer.sdp, type: offer.type },
-                callerName: me.handle,
-                callerUid: me.uid
+                type: 'offer', offer: { sdp: offer.sdp, type: offer.type },
+                callerName: me.handle, callerUid: me.uid
             });
-        } catch (err) {
-            alert("يرجى السماح بالوصول للميكروفون!");
-            endCall();
-        }
+        } catch (e) { endCall(); }
     };
 
-    // الاستماع للمكالمات الواردة
     function listenForCalls() {
         onSnapshot(doc(db, "calls", me.uid), async (s) => {
             if (!s.exists()) {
                 document.getElementById('callOverlay').style.display = 'none';
-                if(peerConn) peerConn.close();
                 return;
             }
             const data = s.data();
@@ -137,52 +238,47 @@
     window.acceptIncomingCall = async () => {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         peerConn = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        localStream.getTracks().forEach(track => peerConn.addTrack(track, localStream));
+        localStream.getTracks().forEach(t => peerConn.addTrack(t, localStream));
         peerConn.ontrack = e => document.getElementById('remoteAudio').srcObject = e.streams[0];
-
         await peerConn.setRemoteDescription(new RTCSessionDescription(currentCallData.offer));
         const answer = await peerConn.createAnswer();
         await peerConn.setLocalDescription(answer);
-
         await updateDoc(doc(db, "calls", me.uid), {
-            type: 'answer',
-            answer: { sdp: answer.sdp, type: answer.type }
+            type: 'answer', answer: { sdp: answer.sdp, type: answer.type }
         });
         document.getElementById('acceptCall').style.display = 'none';
-        document.getElementById('callInfo').innerText = "مكالمة جارية...";
     };
 
     window.endCall = async () => {
+        if(friendUid) await deleteDoc(doc(db, "calls", friendUid));
         await deleteDoc(doc(db, "calls", me.uid));
-        location.reload(); 
+        location.reload();
     };
 
-    // --- تحسين ظهور الرسائل الصوتية ووقت 12 ساعة ---
-    function formatMessageTime(timestamp) {
-        if (!timestamp) return "";
-        return timestamp.toDate().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+    // --- عرض الرسائل والوقت ---
+    function loadMessages() {
+        const q = query(collection(db, "chats", currentChatId, "messages"), orderBy("time", "asc"));
+        onSnapshot(q, (snaps) => {
+            const box = document.getElementById('messageBox');
+            box.innerHTML = "";
+            snaps.forEach(d => {
+                const m = d.data();
+                box.innerHTML += renderMessage(m);
+            });
+            box.scrollTop = box.scrollHeight;
+        });
     }
 
     function renderMessage(m) {
-        const time = formatMessageTime(m.time);
+        const date = m.time ? m.time.toDate() : new Date();
+        const timeStr = date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
         const isMe = m.sender === me.uid;
-        
-        let content = "";
-        if (m.type === 'text') content = `<div>${m.content}</div>`;
-        else if (m.type === 'audio') {
-            content = `
-                <div class="voice-msg-container">
-                    <button class="play-btn" onclick="playAudio('${m.content}', this)">▶</button>
-                    <div class="voice-wave"></div>
-                    <span style="font-size:10px;">صوت</span>
-                </div>`;
-        }
-        
-        return `
-            <div class="msg ${isMe ? 'sent' : 'received'}">
-                ${content}
-                <div style="font-size:9px; opacity:0.5; margin-top:4px; text-align:left;">${time}</div>
+        let content = m.type === 'text' ? `<div>${m.content}</div>` : 
+            `<div class="voice-msg-container">
+                <button class="play-btn" onclick="playAudio('${m.content}', this)">▶</button>
+                <div class="voice-wave"></div>
             </div>`;
+        return `<div class="msg ${isMe ? 'sent' : 'received'}">${content}<div style="font-size:9px; opacity:0.5; margin-top:4px;">${timeStr}</div></div>`;
     }
 
     window.playAudio = (src, btn) => {
@@ -191,8 +287,6 @@
         btn.innerText = "⏸";
         audio.onended = () => btn.innerText = "▶";
     };
-
-    // (أكمل بقية الكود الخاص بـ loadMessages ليعمل مع renderMessage)
 </script>
 </body>
 </html>
